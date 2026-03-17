@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class ClientRegistrationScreen extends StatefulWidget {
   const ClientRegistrationScreen({super.key});
@@ -100,7 +101,7 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
               const SizedBox(height: 16),
 
               const Text(
-                'Номер телефона',
+                'Номер телефона *',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -110,6 +111,10 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(11),
+                ],
                 decoration: InputDecoration(
                   hintText: '+7 (999) 123-45-67',
                   prefixIcon: const Icon(Icons.phone),
@@ -122,6 +127,9 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Введите номер телефона';
+                  }
+                  if (value.length < 10) {
+                    return 'Введите корректный номер телефона';
                   }
                   return null;
                 },
@@ -189,7 +197,19 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      Navigator.pushReplacementNamed(context, '/client/home');
+                      // Переходим на экран верификации телефона
+                      Navigator.pushNamed(
+                        context,
+                        '/verify',
+                        arguments: {
+                          'userType': 'client',
+                          'phoneNumber': '+7${_phoneController.text}',
+                          'userData': {
+                            'name': _nameController.text,
+                            'email': _emailController.text,
+                          },
+                        },
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(

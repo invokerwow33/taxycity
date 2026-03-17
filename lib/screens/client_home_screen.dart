@@ -46,7 +46,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.pushNamed(context, '/client/history');
+            },
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:taxycity/services/storage_service.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -576,32 +577,63 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Иван Иванов',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+          // Загрузка имени из storage
+          FutureBuilder<String?>(
+            future: Future.value(StorageService.getUserName()),
+            builder: (context, snapshot) {
+              return Text(
+                snapshot.data ?? 'Водитель',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 4),
-          const Text(
-            '+7 (999) 123-45-67',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
+          // Загрузка телефона из storage
+          FutureBuilder<String?>(
+            future: Future.value(StorageService.getUserPhone()),
+            builder: (context, snapshot) {
+              return Text(
+                snapshot.data ?? '',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 32),
-          _buildProfileItem(Icons.directions_car, 'Автомобиль', 'Toyota Camry, Черный'),
-          _buildProfileItem(Icons.badge, 'Номер авто', 'А234ВА124'),
+          // Загрузка данных автомобиля из storage
+          FutureBuilder<List<String?>>(
+            future: Future.wait([
+              StorageService.getDriverCarBrand(),
+              StorageService.getDriverCarColor(),
+            ]),
+            builder: (context, snapshot) {
+              final data = snapshot.data ?? ['', ''];
+              final carInfo = '${data[0] ?? "Toyota"}, ${data[1] ?? "Черный"}';
+              return _buildProfileItem(Icons.directions_car, 'Автомобиль', carInfo);
+            },
+          ),
+          FutureBuilder<String?>(
+            future: Future.value(StorageService.getDriverCarNumber()),
+            builder: (context, snapshot) {
+              return _buildProfileItem(Icons.badge, 'Номер авто', snapshot.data ?? 'А234ВА124');
+            },
+          ),
           _buildProfileItem(Icons.attach_money, 'Заработано сегодня', '4 500 ₽'),
           _buildProfileItem(Icons.star, 'Рейтинг', '4.9 ★'),
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {
-                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              onPressed: () async {
+                await StorageService.logout();
+                if (context.mounted) {
+                  Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+                }
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,

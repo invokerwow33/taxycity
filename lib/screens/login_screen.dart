@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:taxycity/screens/driver_registration_screen.dart';
-import 'package:taxycity/screens/client_registration_screen.dart';
+import 'package:taxycity/services/storage_service.dart';
+import 'package:taxycity/screens/phone_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,7 +11,30 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
   String _userType = 'client';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingSession();
+  }
+
+  void _checkExistingSession() async {
+    // Проверяем, есть ли сохранённая сессия
+    if (StorageService.isLoggedIn()) {
+      final userType = StorageService.getUserType();
+      if (userType != null) {
+        if (mounted) {
+          if (userType == 'driver') {
+            Navigator.pushReplacementNamed(context, '/driver/home');
+          } else {
+            Navigator.pushReplacementNamed(context, '/client/home');
+          }
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 8),
             TextField(
+              controller: _passwordController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: 'Введите пароль',
@@ -94,13 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_userType == 'client') {
-                    Navigator.pushReplacementNamed(context, '/client/home');
-                  } else {
-                    Navigator.pushReplacementNamed(context, '/driver/home');
-                  }
-                },
+                onPressed: _login,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1565C0),
                   foregroundColor: Colors.white,
@@ -121,6 +139,33 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+
+  void _login() async {
+    final phone = _phoneController.text;
+    final password = _passwordController.text;
+    
+    if (phone.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Заполните все поля'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Сохраняем данные сессии
+    await StorageService.setUserType(_userType);
+    await StorageService.setUserPhone('+7$phone');
+    await StorageService.setLoggedIn(true);
+    await StorageService.setPhoneVerified(true);
+    
+    if (_userType == 'client') {
+      Navigator.pushReplacementNamed(context, '/client/home');
+    } else {
+      Navigator.pushReplacementNamed(context, '/driver/home');
+    }
   }
 
   Widget _buildUserTypeButton(String type, String label) {
@@ -164,6 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 }

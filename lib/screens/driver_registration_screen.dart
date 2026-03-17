@@ -269,7 +269,21 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      Navigator.pushReplacementNamed(context, '/driver/home');
+                      // Переходим на экран верификации телефона
+                      Navigator.pushNamed(
+                        context,
+                        '/verify',
+                        arguments: {
+                          'userType': 'driver',
+                          'phoneNumber': '+7${_phoneController.text}',
+                          'userData': {
+                            'name': _nameController.text,
+                            'carNumber': _carNumberController.text,
+                            'carBrand': _carBrandController.text,
+                            'carColor': _carColorController.text,
+                          },
+                        },
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(
