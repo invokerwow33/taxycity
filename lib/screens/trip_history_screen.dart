@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:taxycity/services/storage_service.dart';
 
 class TripHistoryScreen extends StatefulWidget {
   const TripHistoryScreen({super.key});
@@ -10,6 +13,8 @@ class TripHistoryScreen extends StatefulWidget {
 class _TripHistoryScreenState extends State<TripHistoryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _isLoading = false;
+  bool _isRefreshing = false;
   
   // Демо данные истории поездок
   final List<Map<String, dynamic>> _completedTrips = [
@@ -24,6 +29,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       'driverName': 'Алексей',
       'driverRating': 4.8,
       'car': 'Toyota Camry (А777АА)',
+      'driverPhoto': null,
     },
     {
       'id': '1002',
@@ -36,6 +42,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       'driverName': 'Мария',
       'driverRating': 5.0,
       'car': 'Kia Rio (В555ОР)',
+      'driverPhoto': null,
     },
     {
       'id': '1003',
@@ -48,6 +55,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       'driverName': 'Иван',
       'driverRating': 4.5,
       'car': 'Hyundai Solaris (С333КХ)',
+      'driverPhoto': null,
     },
     {
       'id': '1004',
@@ -60,6 +68,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       'driverName': 'Пётр',
       'driverRating': 4.9,
       'car': 'Volkswagen Polo (Е123МР)',
+      'driverPhoto': null,
     },
     {
       'id': '1005',
@@ -72,6 +81,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       'driverName': 'Анна',
       'driverRating': 4.7,
       'car': 'Renault Logan (К789ОР)',
+      'driverPhoto': null,
     },
   ];
 
@@ -102,6 +112,37 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    // Имитация загрузки данных
+    await Future.delayed(const Duration(milliseconds: 800));
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _onRefresh() async {
+    setState(() {
+      _isRefreshing = true;
+    });
+    
+    // Имитация обновления данных
+    await Future.delayed(const Duration(seconds: 1));
+    
+    if (mounted) {
+      setState(() {
+        _isRefreshing = false;
+      });
+    }
   }
 
   @override
@@ -134,7 +175,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
           // Статистика
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.grey[100],
+            color: Theme.of(context).cardColor,
             child: Row(
               children: [
                 Expanded(
@@ -158,22 +199,49 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
 
           // Список поездок
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Все поездки
-                _buildTripsList([
-                  ..._completedTrips,
-                  ..._cancelledTrips,
-                ]),
-                // Завершённые
-                _buildTripsList(_completedTrips),
-                // Отменённые
-                _buildTripsList(_cancelledTrips),
-              ],
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Все поездки
+                  _isLoading 
+                      ? _buildShimmerList()
+                      : _buildTripsList([..._completedTrips, ..._cancelledTrips]),
+                  // Завершённые
+                  _isLoading 
+                      ? _buildShimmerList()
+                      : _buildTripsList(_completedTrips),
+                  // Отменённые
+                  _isLoading 
+                      ? _buildShimmerList()
+                      : _buildTripsList(_cancelledTrips),
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerList() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 5,
+        itemBuilder: (context, index) {
+          return Container(
+            height: 120,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          );
+        },
       ),
     );
   }
@@ -182,7 +250,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -255,9 +323,9 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -267,12 +335,12 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
       ),
       child: Column(
         children: [
+          // Заголовок карточки
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Заголовок с датой и статусом
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -375,39 +443,44 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
                       Expanded(
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.person,
-                              size: 16,
-                              color: Colors.grey,
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: const Color(0xFF1565C0),
+                              child: Text(
+                                trip['driverName'][0],
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              trip['driverName'],
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    trip['driverName'],
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  RatingBarIndicator(
+                                    rating: trip['driverRating'],
+                                    itemBuilder: (context, _) => const Icon(
+                                      Icons.star,
+                                      color: Colors.amber,
+                                    ),
+                                    itemCount: 5,
+                                    itemSize: 14,
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      // Рейтинг
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            size: 16,
-                            color: Colors.amber,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${trip['driverRating']}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
@@ -469,7 +542,9 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isCompleted ? Colors.green[50] : Colors.grey[50],
+              color: isCompleted 
+                  ? Colors.green.withOpacity(0.05)
+                  : Colors.grey.withOpacity(0.05),
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(16),
                 bottomRight: Radius.circular(16),
@@ -477,19 +552,36 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
             ),
             child: Row(
               children: [
-                Text(
-                  trip['price'],
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isCompleted ? Colors.green : Colors.grey,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      trip['price'],
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isCompleted ? Colors.green : Colors.grey,
+                      ),
+                    ),
+                    if (isCompleted)
+                      TextButton(
+                        onPressed: () => _showRatingDialog(trip),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Оценить поездку',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                  ],
                 ),
                 const Spacer(),
                 if (isCompleted)
                   OutlinedButton(
                     onPressed: () {
-                      // Повторить поездку
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Маршрут скопирован'),
@@ -504,9 +596,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
                   ),
                 if (!isCompleted)
                   OutlinedButton(
-                    onPressed: () {
-                      // Заново заказать
-                    },
+                    onPressed: () {},
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF1565C0),
                       side: const BorderSide(color: Color(0xFF1565C0)),
@@ -515,6 +605,57 @@ class _TripHistoryScreenState extends State<TripHistoryScreen>
                   ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRatingDialog(Map<String, dynamic> trip) {
+    double rating = 5.0;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Оцените поездку'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Водитель: ${trip['driverName']}'),
+            const SizedBox(height: 16),
+            RatingBar.builder(
+              initialRating: 5.0,
+              minRating: 1,
+              direction: Axis.horizontal,
+              allowHalfRating: true,
+              itemCount: 5,
+              itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+              itemBuilder: (context, _) => const Icon(
+                Icons.star,
+                color: Colors.amber,
+              ),
+              onRatingUpdate: (newRating) {
+                rating = newRating;
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Позже'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Спасибо за ваш отзыв!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('Оценить'),
           ),
         ],
       ),

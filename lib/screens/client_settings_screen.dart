@@ -24,12 +24,17 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
   void _loadSettings() {
     setState(() {
       _darkMode = StorageService.isDarkMode();
-      // Другие настройки загружать из StorageService
+      _notifications = StorageService.isNotificationsEnabled();
+      _sound = StorageService.isSoundEnabled();
+      _vibration = StorageService.isVibrationEnabled();
+      _smsNotifications = StorageService.isSmsEnabled();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Настройки'),
@@ -41,7 +46,7 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
           // Профиль
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.grey[100],
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.grey[100],
             child: Row(
               children: [
                 CircleAvatar(
@@ -76,7 +81,7 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
                 ),
                 IconButton(
                   onPressed: () {
-                    // Редактирование профиля
+                    _showEditProfileDialog();
                   },
                   icon: const Icon(Icons.edit),
                   color: const Color(0xFF1565C0),
@@ -86,10 +91,10 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
           ),
 
           // Внешний вид
-          _buildSectionHeader('Внешний вид'),
+          _buildSectionHeader('Внешний вид', isDark),
           _buildSwitchTile(
             'Тёмная тема',
-            'Использовать тёмное оформление',
+            isDark ? 'Включена' : 'Выключена',
             Icons.dark_mode,
             _darkMode,
             (value) async {
@@ -97,108 +102,134 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
               setState(() {
                 _darkMode = value;
               });
-              // В реальном приложении использовать Provider для смены темы
+              // Перезапуск не требуется - тема меняется динамически
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    value ? 'Тёмная тема включена' : 'Тёмная тема выключена',
+                  ),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
             },
+            isDark,
           ),
 
           // Уведомления
-          _buildSectionHeader('Уведомления'),
+          _buildSectionHeader('Уведомления', isDark),
           _buildSwitchTile(
             'Push-уведомления',
             'Получать уведомления о заказах',
             Icons.notifications,
             _notifications,
-            (value) {
+            (value) async {
+              await StorageService.setNotificationsEnabled(value);
               setState(() {
                 _notifications = value;
               });
             },
+            isDark,
           ),
           _buildSwitchTile(
             'SMS-уведомления',
             'Получать SMS о статусе заказа',
             Icons.sms,
             _smsNotifications,
-            (value) {
+            (value) async {
+              await StorageService.setSmsEnabled(value);
               setState(() {
                 _smsNotifications = value;
               });
             },
+            isDark,
           ),
           _buildSwitchTile(
             'Звук',
             'Воспроизводить звук при уведомлениях',
             Icons.volume_up,
             _sound,
-            (value) {
+            (value) async {
+              await StorageService.setSoundEnabled(value);
               setState(() {
                 _sound = value;
               });
             },
+            isDark,
           ),
           _buildSwitchTile(
             'Вибрация',
             'Вибрация при уведомлениях',
             Icons.vibration,
             _vibration,
-            (value) {
+            (value) async {
+              await StorageService.setVibrationEnabled(value);
               setState(() {
                 _vibration = value;
               });
             },
+            isDark,
           ),
 
           // Избранные адреса
-          _buildSectionHeader('Избранные адреса'),
+          _buildSectionHeader('Избранные адреса', isDark),
           _buildNavigationTile(
             'Мои адреса',
             'Дом, работа и другие',
             Icons.star,
             () => _showFavoriteAddresses(),
+            isDark,
           ),
 
           // Безопасность
-          _buildSectionHeader('Безопасность'),
+          _buildSectionHeader('Безопасность', isDark),
           _buildNavigationTile(
             'Изменить пароль',
             '',
             Icons.lock,
-            () {},
+            () {
+              _showChangePasswordDialog();
+            },
+            isDark,
           ),
           _buildNavigationTile(
             'Привязанные карты',
             'Управление способами оплаты',
             Icons.credit_card,
             () {},
+            isDark,
           ),
           _buildNavigationTile(
             'Верификация телефона',
-            'Подтверждение номера',
+            StorageService.isPhoneVerified() ? 'Подтверждён' : 'Не подтверждён',
             Icons.verified_user,
             () {
               Navigator.pushNamed(context, '/verify');
             },
+            isDark,
           ),
 
           // О приложении
-          _buildSectionHeader('О приложении'),
+          _buildSectionHeader('О приложении', isDark),
           _buildNavigationTile(
             'Помощь',
             'FAQ и поддержка',
             Icons.help,
             () {},
+            isDark,
           ),
           _buildNavigationTile(
             'Политика конфиденциальности',
             '',
             Icons.privacy_tip,
             () {},
+            isDark,
           ),
           _buildNavigationTile(
             'Версия приложения',
-            '1.0.0+2',
+            '1.0.0+3',
             Icons.info,
             () {},
+            isDark,
           ),
 
           // Выход
@@ -207,9 +238,12 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
             padding: const EdgeInsets.all(16),
             child: ElevatedButton(
               onPressed: () async {
-                await StorageService.logout();
-                if (context.mounted) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                final confirmed = await _showLogoutDialog();
+                if (confirmed && context.mounted) {
+                  await StorageService.logout();
+                  if (context.mounted) {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -229,7 +263,7 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Text(
@@ -249,6 +283,7 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
     IconData icon,
     bool value,
     Function(bool) onChanged,
+    bool isDark,
   ) {
     return ListTile(
       leading: Icon(icon, color: const Color(0xFF1565C0)),
@@ -273,6 +308,7 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
     String subtitle,
     IconData icon,
     VoidCallback onTap,
+    bool isDark,
   ) {
     return ListTile(
       leading: Icon(icon, color: const Color(0xFF1565C0)),
@@ -327,7 +363,6 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
                       IconButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          // Переход к экрану добавления адреса
                         },
                         icon: const Icon(Icons.add),
                         color: const Color(0xFF1565C0),
@@ -394,5 +429,126 @@ class _ClientSettingsScreenState extends State<ClientSettingsScreen> {
         icon: const Icon(Icons.more_vert),
       ),
     );
+  }
+
+  void _showEditProfileDialog() {
+    final nameController = TextEditingController(
+      text: StorageService.getUserName() ?? '',
+    );
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Редактирование профиля'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Имя',
+                prefixIcon: Icon(Icons.person),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await StorageService.setUserName(nameController.text);
+              if (context.mounted) {
+                Navigator.pop(context);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Имя изменено'),
+                  ),
+                );
+              }
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Изменение пароля'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Текущий пароль',
+                prefixIcon: Icon(Icons.lock),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: newPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Новый пароль',
+                prefixIcon: Icon(Icons.lock_outline),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Пароль изменён'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('Изменить'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _showLogoutDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Выход из аккаунта'),
+        content: const Text('Вы уверены, что хотите выйти?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 }

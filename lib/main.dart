@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:taxycity/services/storage_service.dart';
 import 'package:taxycity/services/notification_service.dart';
+import 'package:taxycity/services/theme_service.dart';
 import 'package:taxycity/screens/welcome_screen.dart';
 import 'package:taxycity/screens/login_screen.dart';
 import 'package:taxycity/screens/driver_registration_screen.dart';
@@ -22,24 +23,46 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isDarkMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTheme();
+  }
+
+  void _loadTheme() {
+    setState(() {
+      _isDarkMode = StorageService.isDarkMode();
+    });
+  }
+
+  void _toggleTheme(bool value) async {
+    await StorageService.setDarkMode(value);
+    setState(() {
+      _isDarkMode = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TaxyCity',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        primaryColor: const Color(0xFF1565C0),
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1565C0),
-          primary: const Color(0xFF1565C0),
-        ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: SplashScreen(
+        onThemeLoaded: _loadTheme,
       ),
-      home: const SplashScreen(),
       routes: {
         '/welcome': (context) => const WelcomeScreen(),
         '/login': (context) => const LoginScreen(),
@@ -59,7 +82,9 @@ class MyApp extends StatelessWidget {
 }
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final VoidCallback? onThemeLoaded;
+
+  const SplashScreen({super.key, this.onThemeLoaded});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -95,6 +120,8 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(seconds: 2));
     
     if (!mounted) return;
+
+    widget.onThemeLoaded?.call();
 
     final isLoggedIn = StorageService.isLoggedIn();
     final userType = StorageService.getUserType();

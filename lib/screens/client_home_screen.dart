@@ -47,10 +47,23 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   // Избранные адреса
   final List<Map<String, String>> _favoriteAddresses = [
-    {'name': 'Дом', 'address': 'ул. Ленина, 1', 'icon': Icons.home},
-    {'name': 'Работа', 'address': 'пр. Победы, 50', 'icon': Icons.work},
-    {'name': 'Спортзал', 'address': 'ул. Физкультурная, 15', 'icon': Icons.fitness_center},
+    {'name': 'Дом', 'address': 'ул. Ленина, 1', 'icon': 'home'},
+    {'name': 'Работа', 'address': 'пр. Победы, 50', 'icon': 'work'},
+    {'name': 'Спортзал', 'address': 'ул. Физкультурная, 15', 'icon': 'fitness_center'},
   ];
+
+  IconData _getIconFromString(String iconName) {
+    switch (iconName) {
+      case 'home':
+        return Icons.home;
+      case 'work':
+        return Icons.work;
+      case 'fitness_center':
+        return Icons.fitness_center;
+      default:
+        return Icons.place;
+    }
+  }
 
   @override
   void initState() {
@@ -236,7 +249,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  address['icon'] as IconData,
+                                  _getIconFromString(address['icon']!),
                                   color: const Color(0xFF1565C0),
                                 ),
                                 const SizedBox(height: 4),
