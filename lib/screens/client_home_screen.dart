@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:taxycity/services/location_service.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:taxycity/services/map_service.dart';
 import 'package:taxycity/services/notification_service.dart';
+import 'package:taxycity/services/storage_service.dart';
 
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
@@ -21,8 +23,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   bool _isPetAllowed = false;
   bool _isLuggage = false;
   bool _isWaiting = false;
+  
   double? _currentLat;
   double? _currentLng;
+  double? _destinationLat;
+  double? _destinationLng;
+  double? _distance;
+  int? _eta;
+  
+  GoogleMapController? _mapController;
+  bool _isMapReady = false;
 
   final Map<String, Map<String, dynamic>> _tariffs = {
     'econom': {
@@ -52,6 +62,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     {'name': 'Спортзал', 'address': 'ул. Физкультурная, 15', 'icon': 'fitness_center'},
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
   IconData _getIconFromString(String iconName) {
     switch (iconName) {
       case 'home':
@@ -65,27 +81,28 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _getCurrentLocation();
-  }
-
   Future<void> _getCurrentLocation() async {
     setState(() {
       _isLoadingLocation = true;
     });
 
-    final position = await LocationService.getCurrentLocation();
+    final position = await MapService.getCurrentLocation();
     if (position != null) {
       setState(() {
         _currentLat = position.latitude;
         _currentLng = position.longitude;
-        _fromController.text = await LocationService.getAddressFromCoordinates(
+      });
+      
+      MapService.updateCurrentPosition(position.latitude, position.longitude);
+      
+      // Обновляем маркер на карте
+      if (_mapController != null) {
+        MapService.addStartMarker(
           position.latitude,
           position.longitude,
+          'Моё местоположение',
         );
-      });
+      }
     }
 
     setState(() {
@@ -93,201 +110,115 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     });
   }
 
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+    MapService.updateController(controller);
+    setState(() {
+      _isMapReady = true;
+    });
+    
+    // Добавить маркер текущей позиции
+    if (_currentLat != null && _currentLng != null) {
+      MapService.addStartMarker(_currentLat!, _currentLng!, 'Моё местоположение');
+    }
+    
+    // Переместить камеру к текущей позиции
+    if (_currentLat != null && _currentLng != null) {
+      controller.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(_currentLat!, _currentLng!),
+          15,
+        ),
+      );
+    }
+  }
+
+  void _calculateRoute() {
+    if (_toController.text.isEmpty) return;
+    
+    // Демо расчёт маршрута
+    // В реальном приложении использовать Google Directions API
+    setState(() {
+      _destinationLat = _currentLat != null ? _currentLat! + 0.01 : 55.7658;
+      _destinationLng = _currentLng != null ? _currentLng! + 0.01 : 37.6273;
+      
+      // Демо значения
+      _distance = 3500; // 3.5 км
+      _eta = 12; // 12 минут
+      
+      // Добавить маркер назначения
+      if (_destinationLat != null && _destinationLng != null) {
+        MapService.addEndMarker(
+          _destinationLat!,
+          _destinationLng!,
+          _toController.text,
+        );
+        
+        // Добавить маршрут
+        MapService.addRoute([
+          LatLng(_currentLat ?? 55.7558, _currentLng ?? 37.6173),
+          LatLng(_destinationLat!, _destinationLng!),
+        ]);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('TaxyCity'),
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: () {
-              Navigator.pushNamed(context, '/client/history');
+      body: Stack(
+        children: [
+          // Карта
+          GoogleMap(
+            onMapCreated: _onMapCreated,
+            initialCameraPosition: MapService.getDefaultPosition(),
+            markers: MapService.markers,
+            polylines: MapService.polylines,
+            circles: MapService.circles,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            onTap: (LatLng position) {
+              // При тапе на карту - установить точку назначения
+              setState(() {
+                _destinationLat = position.latitude;
+                _destinationLng = position.longitude;
+                _toController.text = 'Выбрано на карте';
+              });
+              MapService.clearMarkers();
+              if (_currentLat != null && _currentLng != null) {
+                MapService.addStartMarker(_currentLat!, _currentLng!, 'Откуда');
+              }
+              MapService.addEndMarker(position.latitude, position.lng, 'Куда');
+              _calculateRoute();
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.pushNamed(context, '/client/settings');
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Карта (заглушка)
-            Container(
-              height: 200,
-              width: double.infinity,
-              color: Colors.grey[300],
-              child: Stack(
-                children: [
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.map,
-                          size: 50,
-                          color: Colors.grey[500],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Карта',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 16,
-                          ),
-                        ),
-                        if (_currentLat != null && _currentLng != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'GPS: ${_currentLat!.toStringAsFixed(4)}, ${_currentLng!.toStringAsFixed(4)}',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _isLoadingLocation
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.my_location, size: 16, color: Color(0xFF1565C0)),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Мое местоположение',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Кнопка определения места
-                  Positioned(
-                    bottom: 16,
-                    right: 16,
-                    child: FloatingActionButton.small(
-                      onPressed: _getCurrentLocation,
-                      backgroundColor: Colors.white,
-                      child: _isLoadingLocation
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.my_location, color: Color(0xFF1565C0)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Избранные адреса
-                  const Text(
-                    'Избранные адреса',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+          // Панель поиска сверху
+          SafeArea(
+            child: Column(
+              children: [
+                // Панель поиска
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 80,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _favoriteAddresses.length,
-                      itemBuilder: (context, index) {
-                        final address = _favoriteAddresses[index];
-                        return GestureDetector(
-                          onTap: () {
-                            _toController.text = address['address']!;
-                          },
-                          child: Container(
-                            width: 120,
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _getIconFromString(address['icon']!),
-                                  color: const Color(0xFF1565C0),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  address['name']!,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Поле "Откуда" и "Куда"
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
+                  child: Column(
+                    children: [
+                      // Откуда
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
                           children: [
                             Container(
                               width: 12,
@@ -302,21 +233,36 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                               child: TextField(
                                 controller: _fromController,
                                 decoration: const InputDecoration(
-                                  hintText: 'Откуда поехать?',
+                                  hintText: 'Откуда?',
                                   border: InputBorder.none,
                                   isDense: true,
+                                  contentPadding: EdgeInsets.zero,
                                 ),
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.my_location, size: 20),
-                              onPressed: _getCurrentLocation,
-                              color: const Color(0xFF1565C0),
-                            ),
+                            if (_isLoadingLocation)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.my_location, size: 20),
+                                onPressed: _getCurrentLocation,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
                           ],
                         ),
-                        const Divider(),
-                        Row(
+                      ),
+                      const Divider(height: 1),
+                      // Куда
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
                           children: [
                             Container(
                               width: 12,
@@ -331,318 +277,209 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                               child: TextField(
                                 controller: _toController,
                                 decoration: const InputDecoration(
-                                  hintText: 'Куда поехать?',
+                                  hintText: 'Куда?',
                                   border: InputBorder.none,
                                   isDense: true,
+                                  contentPadding: EdgeInsets.zero,
                                 ),
+                                onSubmitted: (_) => _calculateRoute(),
                               ),
                             ),
                           ],
                         ),
-                        // Дополнительные остановки
-                        const Divider(),
-                        Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.orange[700]!),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Кнопки избранных адресов
+                SizedBox(
+                  height: 40,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _favoriteAddresses.length,
+                    itemBuilder: (context, index) {
+                      final address = _favoriteAddresses[index];
+                      return GestureDetector(
+                        onTap: () {
+                          _toController.text = address['address']!;
+                          _calculateRoute();
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: _additionalStopsController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Добавить остановку (необязательно)',
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Выбор тарифа
-                  const Text(
-                    'Выберите тариф',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ..._tariffs.entries.map((entry) {
-                    return _buildTariffCard(entry.key, entry.value);
-                  }),
-                  const SizedBox(height: 16),
-
-                  // Дополнительные опции
-                  const Text(
-                    'Дополнительные опции',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildOptionSwitch(
-                          'Перевозка животных',
-                          Icons.pets,
-                          _isPetAllowed,
-                          (value) => setState(() => _isPetAllowed = value),
-                        ),
-                        const Divider(),
-                        _buildOptionSwitch(
-                          'Багаж в салоне',
-                          Icons.luggage,
-                          _isLuggage,
-                          (value) => setState(() => _isLuggage = value),
-                        ),
-                        const Divider(),
-                        _buildOptionSwitch(
-                          'Ожидание на месте (бесплатно 5 мин)',
-                          Icons.timer,
-                          _isWaiting,
-                          (value) => setState(() => _isWaiting = value),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Заказ на время
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.access_time, color: Color(0xFF1565C0)),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Заказ на время',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Switch(
-                              value: _isScheduleLater,
-                              onChanged: (value) {
-                                setState(() {
-                                  _isScheduleLater = value;
-                                });
-                              },
-                              activeColor: const Color(0xFF1565C0),
-                            ),
-                          ],
-                        ),
-                        if (_isScheduleLater) ...[
-                          const SizedBox(height: 16),
-                          Row(
+                            ],
+                          ),
+                          child: Row(
                             children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: _selectDate,
-                                  icon: const Icon(Icons.calendar_today),
-                                  label: Text(
-                                    _selectedDate != null
-                                        ? '${_selectedDate!.day}.${_selectedDate!.month}.${_selectedDate!.year}'
-                                        : 'Выбрать дату',
-                                  ),
-                                ),
+                              Icon(
+                                _getIconFromString(address['icon']!),
+                                size: 16,
+                                color: const Color(0xFF1565C0),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: _selectTime,
-                                  icon: const Icon(Icons.access_time),
-                                  label: Text(
-                                    _selectedTime != null
-                                        ? _selectedTime!.format(context)
-                                        : 'Выбрать время',
-                                  ),
+                              const SizedBox(width: 4),
+                              Text(
+                                address['name']!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Кнопка "Поделиться поездкой"
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Ссылка на поездку скопирована!'),
                         ),
                       );
                     },
-                    icon: const Icon(Icons.share),
-                    label: const Text('Поделиться поездкой'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF1565C0),
-                      minimumSize: const Size(double.infinity, 48),
-                    ),
                   ),
-                  const SizedBox(height: 16),
+                ),
+              ],
+            ),
+          ),
 
-                  // Итоговая стоимость
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
+          // Кнопка моего местоположения
+          Positioned(
+            right: 16,
+            bottom: _destinationLat != null ? 280 : 100,
+            child: FloatingActionButton(
+              mini: true,
+              onPressed: () async {
+                await _getCurrentLocation();
+                if (_mapController != null && _currentLat != null && _currentLng != null) {
+                  _mapController!.animateCamera(
+                    CameraUpdate.newLatLngZoom(
+                      LatLng(_currentLat!, _currentLng!),
+                      15,
                     ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  );
+                }
+              },
+              backgroundColor: Colors.white,
+              child: _isLoadingLocation
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF1565C0),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.my_location,
+                      color: Color(0xFF1565C0),
+                    ),
+            ),
+          ),
+
+          // Панель выбора тарифа и заказа
+          if (_destinationLat != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Информация о поездке
+                    if (_distance != null && _eta != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Row(
                           children: [
-                            const Text(
-                              'Предварительная стоимость:',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
+                            const Icon(Icons.straighten, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(
+                              MapService.formatDistance(_distance!),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
+                            const SizedBox(width: 16),
+                            const Icon(Icons.timer, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
                             Text(
-                              _calculatePrice(),
+                              MapService.formatDuration(_eta!),
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
-                        if (_isPetAllowed || _isLuggage || _isWaiting)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Row(
-                              children: [
-                                const Text(
-                                  'Включено: ',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                if (_isPetAllowed)
-                                  _buildTag('Животные'),
-                                if (_isLuggage)
-                                  _buildTag('Багаж'),
-                                if (_isWaiting)
-                                  _buildTag('Ожидание'),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              NotificationService.orderAccepted();
-                              Navigator.pushNamed(context, '/client/order');
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF1565C0),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: const Text(
-                              'Заказать такси',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                      ),
+
+                    // Выбор тарифа
+                    const Text(
+                      'Выберите тариф',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    ..._tariffs.entries.map((entry) {
+                      return _buildTariffCard(entry.key, entry.value);
+                    }),
+
+                    const SizedBox(height: 16),
+
+                    // Кнопка заказа
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          NotificationService.orderAccepted();
+                          Navigator.pushNamed(context, '/client/order');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1565C0),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                      ],
+                        child: Text(
+                          'Заказать за ${MapService.calculatePrice(_distance ?? 0, _selectedTariff)} ₽',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOptionSwitch(
-    String label,
-    IconData icon,
-    bool value,
-    Function(bool) onChanged,
-  ) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFF1565C0)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(label),
-        ),
-        Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: const Color(0xFF1565C0),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTag(String label) {
-    return Container(
-      margin: const EdgeInsets.only(right: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-        ),
+        ],
       ),
     );
   }
@@ -656,11 +493,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         });
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF1565C0).withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected ? const Color(0xFF1565C0).withOpacity(0.1) : Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? const Color(0xFF1565C0) : Colors.grey[200]!,
             width: isSelected ? 2 : 1,
@@ -669,17 +506,18 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF1565C0) : Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
+                color: isSelected ? const Color(0xFF1565C0) : Colors.grey[200],
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 tariff['icon'],
+                size: 20,
                 color: isSelected ? Colors.white : const Color(0xFF1565C0),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -687,16 +525,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   Text(
                     tariff['name'],
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: isSelected ? const Color(0xFF1565C0) : Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 4),
                   Text(
                     tariff['description'],
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: Colors.grey[600],
                     ),
                   ),
@@ -706,7 +543,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             Text(
               tariff['price'],
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: isSelected ? const Color(0xFF1565C0) : Colors.black,
               ),
@@ -717,64 +554,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  String _calculatePrice() {
-    if (_toController.text.isEmpty) {
-      return '—';
-    }
-    int basePrice;
-    switch (_selectedTariff) {
-      case 'econom':
-        basePrice = 250;
-        break;
-      case 'comfort':
-        basePrice = 450;
-        break;
-      case 'business':
-        basePrice = 800;
-        break;
-      default:
-        basePrice = 250;
-    }
-    
-    // Доплата за опции
-    if (_isPetAllowed) basePrice += 50;
-    if (_isLuggage) basePrice += 30;
-    if (_isWaiting) basePrice += 20;
-    
-    return 'от $basePrice ₽';
-  }
-
-  Future<void> _selectDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-    if (date != null) {
-      setState(() {
-        _selectedDate = date;
-      });
-    }
-  }
-
-  Future<void> _selectTime() async {
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (time != null) {
-      setState(() {
-        _selectedTime = time;
-      });
-    }
-  }
-
   @override
   void dispose() {
     _fromController.dispose();
     _toController.dispose();
     _additionalStopsController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 }

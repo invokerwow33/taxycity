@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:taxycity/services/storage_service.dart';
 import 'package:taxycity/services/notification_service.dart';
+import 'package:taxycity/services/firebase_service.dart';
 import 'package:taxycity/services/theme_service.dart';
 import 'package:taxycity/screens/welcome_screen.dart';
 import 'package:taxycity/screens/login_screen.dart';
@@ -17,9 +18,19 @@ import 'package:taxycity/screens/driver_settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Инициализация сервисов
   await StorageService.init();
   await NotificationService.init();
   await NotificationService.requestPermissions();
+  
+  // Инициализация Firebase (раскомментировать при настройке Firebase)
+  // try {
+  //   await FirebaseService.initialize();
+  // } catch (e) {
+  //   print('Firebase initialization failed: $e');
+  // }
+  
   runApp(const MyApp());
 }
 
@@ -42,13 +53,6 @@ class _MyAppState extends State<MyApp> {
   void _loadTheme() {
     setState(() {
       _isDarkMode = StorageService.isDarkMode();
-    });
-  }
-
-  void _toggleTheme(bool value) async {
-    await StorageService.setDarkMode(value);
-    setState(() {
-      _isDarkMode = value;
     });
   }
 
