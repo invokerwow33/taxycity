@@ -17,6 +17,12 @@ class StorageService {
   // История поездок
   static const String _keyTripHistory = 'trip_history';
   
+  // Избранные адреса
+  static const String _keyFavoriteAddresses = 'favorite_addresses';
+  
+  // Тема приложения
+  static const String _keyDarkMode = 'dark_mode';
+  
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
   }
@@ -107,6 +113,51 @@ class StorageService {
   
   static String? getVerificationCode() {
     return _prefs.getString(_keyVerificationCode);
+  }
+  
+  // Тема приложения
+  static Future<void> setDarkMode(bool value) async {
+    await _prefs.setBool(_keyDarkMode, value);
+  }
+  
+  static bool isDarkMode() {
+    return _prefs.getBool(_keyDarkMode) ?? false;
+  }
+  
+  // Избранные адреса
+  static Future<void> addFavoriteAddress(Map<String, String> address) async {
+    final favorites = getFavoriteAddresses();
+    favorites.add(address);
+    final jsonList = favorites.map((addr) => addr.toString()).toList();
+    await _prefs.setStringList(_keyFavoriteAddresses, jsonList);
+  }
+  
+  static Future<void> removeFavoriteAddress(int index) async {
+    final favorites = getFavoriteAddresses();
+    if (index >= 0 && index < favorites.length) {
+      favorites.removeAt(index);
+      final jsonList = favorites.map((addr) => addr.toString()).toList();
+      await _prefs.setStringList(_keyFavoriteAddresses, jsonList);
+    }
+  }
+  
+  static List<Map<String, String>> getFavoriteAddresses() {
+    final jsonList = _prefs.getStringList(_keyFavoriteAddresses) ?? [];
+    // Упрощённая реализация - в реальном приложении использовать JSON
+    List<Map<String, String>> result = [];
+    
+    // Предзаполненные избранные адреса
+    if (jsonList.isEmpty) {
+      result = [
+        {'name': 'Дом', 'address': '', 'lat': '', 'lng': ''},
+        {'name': 'Работа', 'address': '', 'lat': '', 'lng': ''},
+      ];
+    } else {
+      for (var item in jsonList) {
+        result.add({'name': '', 'address': item, 'lat': '', 'lng': ''});
+      }
+    }
+    return result;
   }
   
   // История поездок
