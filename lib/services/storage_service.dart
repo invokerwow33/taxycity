@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class StorageService {
   static late SharedPreferences _prefs;
@@ -22,6 +23,12 @@ class StorageService {
   
   // Тема приложения
   static const String _keyDarkMode = 'dark_mode';
+  
+  // Настройки уведомлений
+  static const String _keyNotificationsEnabled = 'notifications_enabled';
+  static const String _keySoundEnabled = 'sound_enabled';
+  static const String _keyVibrationEnabled = 'vibration_enabled';
+  static const String _keySmsEnabled = 'sms_enabled';
   
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -124,11 +131,44 @@ class StorageService {
     return _prefs.getBool(_keyDarkMode) ?? false;
   }
   
+  // Настройки уведомлений
+  static Future<void> setNotificationsEnabled(bool value) async {
+    await _prefs.setBool(_keyNotificationsEnabled, value);
+  }
+  
+  static bool isNotificationsEnabled() {
+    return _prefs.getBool(_keyNotificationsEnabled) ?? true;
+  }
+  
+  static Future<void> setSoundEnabled(bool value) async {
+    await _prefs.setBool(_keySoundEnabled, value);
+  }
+  
+  static bool isSoundEnabled() {
+    return _prefs.getBool(_keySoundEnabled) ?? true;
+  }
+  
+  static Future<void> setVibrationEnabled(bool value) async {
+    await _prefs.setBool(_keyVibrationEnabled, value);
+  }
+  
+  static bool isVibrationEnabled() {
+    return _prefs.getBool(_keyVibrationEnabled) ?? true;
+  }
+  
+  static Future<void> setSmsEnabled(bool value) async {
+    await _prefs.setBool(_keySmsEnabled, value);
+  }
+  
+  static bool isSmsEnabled() {
+    return _prefs.getBool(_keySmsEnabled) ?? true;
+  }
+  
   // Избранные адреса
   static Future<void> addFavoriteAddress(Map<String, String> address) async {
     final favorites = getFavoriteAddresses();
     favorites.add(address);
-    final jsonList = favorites.map((addr) => addr.toString()).toList();
+    final jsonList = favorites.map((addr) => jsonEncode(addr)).toList();
     await _prefs.setStringList(_keyFavoriteAddresses, jsonList);
   }
   
@@ -136,25 +176,30 @@ class StorageService {
     final favorites = getFavoriteAddresses();
     if (index >= 0 && index < favorites.length) {
       favorites.removeAt(index);
-      final jsonList = favorites.map((addr) => addr.toString()).toList();
+      final jsonList = favorites.map((addr) => jsonEncode(addr)).toList();
       await _prefs.setStringList(_keyFavoriteAddresses, jsonList);
     }
   }
   
   static List<Map<String, String>> getFavoriteAddresses() {
     final jsonList = _prefs.getStringList(_keyFavoriteAddresses) ?? [];
-    // Упрощённая реализация - в реальном приложении использовать JSON
-    List<Map<String, String>> result = [];
     
-    // Предзаполненные избранные адреса
     if (jsonList.isEmpty) {
-      result = [
+      return [
         {'name': 'Дом', 'address': '', 'lat': '', 'lng': ''},
         {'name': 'Работа', 'address': '', 'lat': '', 'lng': ''},
       ];
-    } else {
-      for (var item in jsonList) {
-        result.add({'name': '', 'address': item, 'lat': '', 'lng': ''});
+    }
+    
+    List<Map<String, String>> result = [];
+    for (var item in jsonList) {
+      try {
+        final decoded = jsonDecode(item);
+        if (decoded is Map) {
+          result.add(Map<String, String>.from(decoded));
+        }
+      } catch (e) {
+        // Игнорируем ошибки парсинга
       }
     }
     return result;
@@ -164,29 +209,19 @@ class StorageService {
   static Future<void> addTripToHistory(Map<String, dynamic> trip) async {
     final history = getTripHistory();
     history.add(trip);
-    await _prefs.setString(_keyTripHistory, tripHistoryToJson(history));
+    await _prefs.setString(_keyTripHistory, jsonEncode(history));
   }
   
   static List<Map<String, dynamic>> getTripHistory() {
-    final json = _prefs.getString(_keyTripHistory);
-    if (json == null) return [];
-    return tripHistoryFromJson(json);
-  }
-  
-  static String tripHistoryToJson(List<Map<String, dynamic>> history) {
-    return history.map((trip) => {
-      'id': trip['id'] ?? '',
-      'from': trip['from'] ?? '',
-      'to': trip['to'] ?? '',
-      'price': trip['price'] ?? '',
-      'date': trip['date'] ?? '',
-      'status': trip['status'] ?? '',
-    }).toList().toString();
-  }
-  
-  static List<Map<String, dynamic>> tripHistoryFromJson(String json) {
-    // Упрощённая реализация - в реальном приложении использовать json.decode
-    return [];
+    final jsonString = _prefs.getString(_keyTripHistory);
+    if (jsonString == null) return [];
+    
+    try {
+      final List<dynamic> decoded = jsonDecode(jsonString);
+      return decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+    } catch (e) {
+      return [];
+    }
   }
   
   // Очистка всех данных (выход из аккаунта)

@@ -67,7 +67,7 @@ class LocationService {
     return (timeHours * 60).round();
   }
 
-  // Предолжение списка ближайших адресов (демо)
+  // Предложение списка ближайших адресов (демо)
   static List<Map<String, dynamic>> getNearbyAddresses(double lat, double lng) {
     // В реальном приложении использовать API геокодирования
     return [
@@ -93,5 +93,33 @@ class LocationService {
         'distance': '500 м',
       },
     ];
+  }
+  
+  // Расчёт стоимости поездки на основе расстояния
+  static double calculatePrice(double distanceKm, String tariff) {
+    double basePrice;
+    double pricePerKm;
+    
+    switch (tariff) {
+      case 'econom':
+        basePrice = 99;
+        pricePerKm = 15;
+        break;
+      case 'comfort':
+        basePrice = 199;
+        pricePerKm = 20;
+        break;
+      case 'business':
+        basePrice = 399;
+        pricePerKm = 30;
+        break;
+      default:
+        basePrice = 99;
+        pricePerKm = 15;
+    }
+    
+    // Минимальная стоимость
+    double totalPrice = basePrice + (distanceKm * pricePerKm);
+    return totalPrice < basePrice ? basePrice : totalPrice;
   }
 }

@@ -14,6 +14,7 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +83,7 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
+                textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   hintText: 'Введите ваше имя',
                   prefixIcon: const Icon(Icons.person),
@@ -94,6 +96,9 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Введите ваше имя';
+                  }
+                  if (value.length < 2) {
+                    return 'Имя слишком короткое';
                   }
                   return null;
                 },
@@ -156,6 +161,14 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
                   filled: true,
                   fillColor: Colors.grey[100],
                 ),
+                validator: (value) {
+                  if (value != null && value.isNotEmpty) {
+                    if (!value.contains('@') || !value.contains('.')) {
+                      return 'Введите корректный email';
+                    }
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -169,10 +182,20 @@ class _ClientRegistrationScreenState extends State<ClientRegistrationScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: 'Придумайте пароль',
                   prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

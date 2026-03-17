@@ -23,27 +23,57 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    // Имитация поиска водителя
+    _simulateOrderProcess();
+  }
+
+  void _simulateOrderProcess() async {
+    await Future.delayed(const Duration(seconds: 3));
+    if (mounted) {
+      setState(() {
+        _orderStatus = 'driverFound';
+      });
+    }
+    
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      setState(() {
+        _orderStatus = 'driverOnWay';
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) return;
+        
         if (_orderStatus != 'completed' && _orderStatus != 'cancelled') {
-          return await _showCancelDialog() ?? false;
+          final shouldPop = await _showCancelDialog();
+          if (shouldPop == true && mounted) {
+            Navigator.pop(context);
+          }
+        } else {
+          Navigator.pop(context);
         }
-        return true;
       },
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Заказ такси'),
           backgroundColor: const Color(0xFF1565C0),
           foregroundColor: Colors.white,
+          automaticallyImplyLeading: _orderStatus == 'searching' || _orderStatus == 'driverFound',
           leading: _orderStatus == 'searching' || _orderStatus == 'driverFound'
               ? IconButton(
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () async {
-                    if (await _showCancelDialog() == true) {
-                      if (mounted) {
-                        Navigator.pop(context);
-                      }
+                    final shouldPop = await _showCancelDialog();
+                    if (shouldPop == true && mounted) {
+                      Navigator.pop(context);
                     }
                   },
                 )
@@ -159,12 +189,11 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
-                                    'Откуда',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
+                                    _orderInfo['from'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ),
@@ -194,12 +223,11 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
-                                    'Куда',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
+                                    _orderInfo['to'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ),
@@ -210,23 +238,23 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  _orderInfo['from'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
+                                const Text(
+                                  'Откуда',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
                                   ),
                                 ),
                                 const Icon(
                                   Icons.arrow_forward,
                                   color: Colors.grey,
+                                  size: 16,
                                 ),
-                                Flexible(
-                                  child: Text(
-                                    _orderInfo['to'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    textAlign: TextAlign.end,
+                                const Text(
+                                  'Куда',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
                                   ),
                                 ),
                               ],
@@ -296,17 +324,6 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
                                           ],
                                         ),
                                       ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1565C0).withOpacity(0.1),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.star,
-                                      color: Color(0xFF1565C0),
                                     ),
                                   ),
                                 ],
@@ -407,7 +424,7 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () {
-                                Navigator.pushNamed(context, '/client/chat');
+                                Navigator.pushNamed(context, '/chat');
                               },
                               icon: const Icon(Icons.chat),
                               label: const Text('Чат'),
@@ -423,7 +440,13 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: () {},
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Звонок водителю...'),
+                                  ),
+                                );
+                              },
                               icon: const Icon(Icons.phone),
                               label: const Text('Позвонить'),
                               style: ElevatedButton.styleFrom(
@@ -446,10 +469,9 @@ class _ClientOrderScreenState extends State<ClientOrderScreen> {
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () async {
-                            if (await _showCancelDialog() == true) {
-                              if (mounted) {
-                                Navigator.pop(context);
-                              }
+                            final shouldPop = await _showCancelDialog();
+                            if (shouldPop == true && mounted) {
+                              Navigator.pop(context);
                             }
                           },
                           style: OutlinedButton.styleFrom(

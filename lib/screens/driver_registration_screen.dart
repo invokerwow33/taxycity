@@ -16,6 +16,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
   final _carColorController = TextEditingController();
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +85,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
+                textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   hintText: 'Введите ваше имя',
                   prefixIcon: const Icon(Icons.person),
@@ -96,6 +98,9 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Введите ваше имя';
+                  }
+                  if (value.length < 2) {
+                    return 'Имя слишком короткое';
                   }
                   return null;
                 },
@@ -185,6 +190,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _carBrandController,
+                textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   hintText: 'Toyota Camry',
                   prefixIcon: const Icon(Icons.car_rental),
@@ -213,6 +219,7 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _carColorController,
+                textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   hintText: 'Черный',
                   prefixIcon: const Icon(Icons.palette),
@@ -241,10 +248,20 @@ class _DriverRegistrationScreenState extends State<DriverRegistrationScreen> {
               const SizedBox(height: 8),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: 'Придумайте пароль',
                   prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

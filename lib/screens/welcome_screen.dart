@@ -69,7 +69,7 @@ class WelcomeScreen extends StatelessWidget {
                   height: 56,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, '/register/client');
+                      Navigator.pushNamed(context, '/client/register');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
@@ -102,7 +102,7 @@ class WelcomeScreen extends StatelessWidget {
                   height: 56,
                   child: OutlinedButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, '/register/driver');
+                      Navigator.pushNamed(context, '/driver/register');
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
